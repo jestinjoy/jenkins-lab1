@@ -3,33 +3,51 @@ pipeline {
     agent any
 
     stages {
-        stage('Build') {
+        stage('Checkout') {
             steps {
-                echo 'Build stage started'
-                sh 'echo Preparing the project...'
+                echo 'Source code is checked out by Jenkins.'
                 sh 'ls -la'
             }
         }
 
-        stage('Test') {
+        stage('Build Docker Image') {
             steps {
-                echo 'Test stage started'
+                sh 'docker build -t jenkins-docker-lab:latest .'
+            }
+        }
 
+        stage('Run Container') {
+            steps {
                 sh '''
-                    if [ -f README.md ]; then
-                        echo "Test passed: README.md exists"
-                    else
-                        echo "Test failed: README.md is missing"
-                        exit 1
-                    fi
+                    docker rm -f jenkins-docker-lab || true
+
+                    docker run -d \
+                        --name jenkins-docker-lab \
+                        --restart unless-stopped \
+                        -p 8082:80 \
+                        jenkins-docker-lab:latest
                 '''
             }
         }
 
-        stage('Finish') {
+        stage('Test Application') {
             steps {
-                echo 'All stages completed successfully!'
+                sh '''
+                    sleep 2
+                    curl --fail http://localhost:8082/
+                '''
             }
+        }
+    }
+
+    post {
+        success {
+            echo 'Application deployed successfully!'
+            echo 'Open http://localhost:8082 in your browser.'
+        }
+
+        failure {
+            echo 'Pipeline failed. Check the Console Output.'
         }
     }
 }
